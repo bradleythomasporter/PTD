@@ -1,23 +1,103 @@
-// middleware/auth.js
-const jwt = require('jsonwebtoken');
+const express = require('express');
+const router = express.Router();
 const User = require('../models/User');
+const jwt = require('jsonwebtoken');
 
-const auth = async (req, res, next) => {
-  try {
-    const token = req.header('Authorization').replace('Bearer ', '');
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findOne({ _id: decoded.userId });
+router.post('/register', async (req, res) => {
+    // Debug logs
+    console.log('Received registration data:', req.body);
+    
+    try {
+        const { name, email, password, isGrower, businessName, zipCode } = req.body;
+        
+        // Log extracted fields
+        console.log('Extracted fields:', { 
+            name, 
+            email, 
+            isGrower, 
+            businessName, 
+            zipCode 
+        });
 
-    if (!user) {
-      throw new Error();
+        // Create new user
+        const user = new User({
+            name,
+            email,
+            password,
+            isGrower,
+            businessName,
+            zipCode
+        });
+
+        await user.save();
+
+        // Create token
+        const token = jwt.sign(
+            { userId: user._id },
+            process.env.JWT_SECRET || 'your-secret-key',
+            { expiresIn: '24h' }
+        );
+
+        res.status(201).json({
+            message: 'User created successfully',
+            token,
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                isGrower: user.isGrower,
+                businessName: user.businessName,
+                zipCode: user.zipCode
+            }
+        });
+    } catch (error) {
+        console.error('Registration error:', error);
+        res.status(400).json({
+            error: 'Registration failed',
+            details: error.message
+        });
     }
+});
 
-    req.user = user;
-    req.token = token;
-    next();
-  } catch (error) {
-    res.status(401).json({ error: 'Please authenticate' });
-  }
-};
+router.post('/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
 
-module.exports = auth;
+        const isValidPassword = await user.validatePassword(password);
+        if (!isValidPassword) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+
+        const token = jwt.sign(
+            { userId: user._id },
+            process.env.JWT_SECRET || 'your-secret-key',
+            { expiresIn: '24h' }
+        );
+
+        res.json({
+            message: 'Login successful',
+            token,
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                isGrower: user.isGrower,
+                businessName: user.businessName,
+                zipCode: user.zipCode
+            }
+        });
+    } catch (error) {
+        console.error('Login error:', error);
+        res.status(400).json({
+            error: 'Login failed',
+            details: error.message
+        });
+    }
+});
+
+module.exports = router;

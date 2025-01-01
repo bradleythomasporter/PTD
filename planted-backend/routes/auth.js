@@ -1,72 +1,115 @@
-// routes/auth.js
 const express = require('express');
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
 const router = express.Router();
+const User = require('../models/User');
+const jwt = require('jsonwebtoken');
 
-// Register new user
 router.post('/register', async (req, res) => {
-  try {
-    const user = new User(req.body);
-    await user.save();
-    
-    // Create token
-    const token = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_SECRET,
-      { expiresIn: '24h' }
-    );
+    // Debug logs
+    console.log('============= REGISTRATION ATTEMPT =============');
+    console.log('Raw request body:', req.body);
+    console.log('Business Name:', req.body.businessName);
+    console.log('Zip Code:', req.body.zipCode);
+    console.log('isGrower:', req.body.isGrower);
+    console.log('===============================================');
 
-    res.status(201).json({
-      message: 'User created successfully',
-      token,
-      user: {
-        id: user._id,
-        email: user.email,
-        name: user.name,
-        isGrower: user.isGrower
-      }
-    });
-  } catch (error) {
-    res.status(400).json({
-      error: 'Registration failed',
-      details: error.message
-    });
-  }
+    try {
+        const { name, email, password, isGrower, businessName, zipCode } = req.body;
+
+        // Log extracted data
+        console.log('Extracted data:', {
+            name,
+            email,
+            isGrower,
+            businessName,
+            zipCode
+        });
+
+        // Validate required fields
+        if (!name || !email || !password) {
+            return res.status(400).json({ error: 'Name, email, and password are required' });
+        }
+
+        if (isGrower && (!businessName || !zipCode)) {
+            return res.status(400).json({ error: 'Zip Code and Business Name are required for growers' });
+        }
+
+        const user = new User({
+            name,
+            email,
+            password,
+            isGrower,
+            businessName: isGrower ? businessName : undefined,
+            zipCode: isGrower ? zipCode : undefined
+        });
+
+        await user.save();
+
+        const token = jwt.sign(
+            { userId: user._id },
+            process.env.JWT_SECRET || 'your-secret-key',
+            { expiresIn: '24h' }
+        );
+
+        res.status(201).json({
+            message: 'User created successfully',
+            token,
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                isGrower: user.isGrower,
+                businessName: user.businessName,
+                zipCode: user.zipCode
+            }
+        });
+    } catch (error) {
+        console.error('Registration error:', error);
+        res.status(400).json({
+            error: 'Registration failed',
+            details: error.message
+        });
+    }
 });
 
-// Login user
 router.post('/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    const user = await User.findOne({ email });
+    try {
+        const { email, password } = req.body;
+        
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
 
-    if (!user || !(await user.validatePassword(password))) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+        const isValidPassword = await user.validatePassword(password);
+        if (!isValidPassword) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+
+        const token = jwt.sign(
+            { userId: user._id },
+            process.env.JWT_SECRET || 'your-secret-key',
+            { expiresIn: '24h' }
+        );
+
+        res.json({
+            message: 'Login successful',
+            token,
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                isGrower: user.isGrower,
+                businessName: user.businessName,
+                zipCode: user.zipCode
+            }
+        });
+    } catch (error) {
+        console.error('Login error:', error);
+        res.status(400).json({
+            error: 'Login failed',
+            details: error.message
+        });
     }
-
-    const token = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_SECRET,
-      { expiresIn: '24h' }
-    );
-
-    res.json({
-      message: 'Login successful',
-      token,
-      user: {
-        id: user._id,
-        email: user.email,
-        name: user.name,
-        isGrower: user.isGrower
-      }
-    });
-  } catch (error) {
-    res.status(400).json({
-      error: 'Login failed',
-      details: error.message
-    });
-  }
 });
 
 module.exports = router;
