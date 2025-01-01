@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import './App.css';
-import GrowerDashboard from './components/GrowerDashboard';
+
 
 const Header = ({ onShowSignup, isLoggedIn, onLogout, isGrower }) => (
   <header className="header">
@@ -26,6 +26,15 @@ const Header = ({ onShowSignup, isLoggedIn, onLogout, isGrower }) => (
   </header>
 );
 
+const GrowerDashboard = () => {
+  return (
+      <div className="grower-dashboard">
+          <h1>Grower Dashboard</h1>
+          <p>Welcome to the Grower Dashboard. Manage your plants and track your sales here.</p>
+          {/* Add more components and functionality as needed */}
+      </div>
+  );
+};
 const Hero = () => (
   <div className="hero">
     <h1 className="hero-title">Discover Local Plants</h1>
